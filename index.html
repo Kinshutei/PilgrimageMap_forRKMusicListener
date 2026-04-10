@@ -57,7 +57,7 @@
       });
     }
 
-    Papa.parse('locations.csv', {
+    Papa.parse('https://kinshutei.github.io/PilgrimageMap_forRKMusicListener/locations.csv', {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -67,12 +67,7 @@
           const lng = parseFloat(row.lng);
           if (isNaN(lat) || isNaN(lng)) return;
 
-          // singer列が複数名の場合は最初の1名のアイコンを使用
-          const primarySinger = row.singer ? row.singer.split(',')[0].trim() : '';
-          const icon = makeIcon(primarySinger);
-          const marker = L.marker([lat, lng], { icon }).addTo(map);
-
-
+          const singers = row.singer ? row.singer.split(',').map(s => s.trim()).filter(Boolean) : [''];
           const gmapsUrl = `https://maps.google.com/?q=${encodeURIComponent(row.name)}&ll=${lat},${lng}`;
           let line2 = row.category;
           if (row.singer) line2 += ` │ ${row.singer}`;
@@ -82,7 +77,14 @@
           if (row.description) popup += `<br>${row.description.replace(/\n/g, '<br>')}`;
           popup += `<br>${line4}`;
 
-          marker.bindPopup(popup);
+          singers.forEach((singer, idx) => {
+            const offset = 0.00003;
+            const angle = (2 * Math.PI / singers.length) * idx;
+            const offsetLat = singers.length > 1 ? lat + offset * Math.cos(angle) : lat;
+            const offsetLng = singers.length > 1 ? lng + offset * Math.sin(angle) : lng;
+            const icon = makeIcon(singer);
+            L.marker([offsetLat, offsetLng], { icon }).addTo(map).bindPopup(popup);
+          });
         });
       }
     });
