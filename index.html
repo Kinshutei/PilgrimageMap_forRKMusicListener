@@ -30,7 +30,7 @@
 
     // シンガー別アイコンが揃い次第、icons/${singerName}_MapIcon.png を参照する
     const SINGER_ICONS = [
-      // 例: '深影', '妃玖',
+      'LEWNE',
     ];
 
     function makeIcon(singerName) {
@@ -61,7 +61,7 @@
           const marker = L.marker([lat, lng], { icon }).addTo(map);
 
 
-          const gmapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+          const gmapsUrl = `https://maps.google.com/?q=${encodeURIComponent(row.name)}&ll=${lat},${lng}`;
           let popup = `<b>${row.name}</b><br>${row.category}`;
           if (row.singer) popup += ` | ${row.singer}`;
           if (row.description) popup += `<br>${row.description}`;
