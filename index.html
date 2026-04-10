@@ -62,12 +62,13 @@
 
 
           const gmapsUrl = `https://maps.google.com/?q=${encodeURIComponent(row.name)}&ll=${lat},${lng}`;
-          let popup = `<b>${row.name}</b><br>${row.category}`;
-          if (row.singer) popup += ` | ${row.singer}`;
+          let line2 = row.category;
+          if (row.singer) line2 += ` │ ${row.singer}`;
+          let line4 = `<a href="${gmapsUrl}" target="_blank">Googleマップで開く</a>`;
+          if (row.source_url) line4 += ` │ <a href="${row.source_url}" target="_blank">出典</a>`;
+          let popup = `<b>${row.name}</b><br>${line2}`;
           if (row.description) popup += `<br>${row.description}`;
-          popup += `<br>`;
-          if (row.source_url) popup += `<a href="${row.source_url}" target="_blank">出典</a> ／ `;
-          popup += `<a href="${gmapsUrl}" target="_blank">Googleマップで開く</a>`;
+          popup += `<br>${line4}`;
 
           marker.bindPopup(popup);
         });
