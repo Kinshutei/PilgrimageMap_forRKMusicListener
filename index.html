@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>聖地巡礼マップ - RK Music</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; }
+    #map { height: 100vh; width: 100%; }
+
+    #legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    #legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #legend .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 0 1px #aaa;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="legend"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    const map = L.map('map').setView([35.6812, 139.7671], 10);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
+    }).addTo(map);
+
+    const CATEGORY_COLORS = {
+      'ライブ会場': '#e74c3c',
+      'MV撮影地': '#3498db',
+      'お気に入り店': '#2ecc71',
+    };
+    const DEFAULT_COLOR = '#95a5a6';
+
+    // 凡例を生成
+    const legend = document.getElementById('legend');
+    Object.entries(CATEGORY_COLORS).forEach(([name, color]) => {
+      legend.innerHTML += `
+        <div class="legend-item">
+          <div class="dot" style="background:${color}"></div>
+          <span>${name}</span>
+        </div>`;
+    });
+
+    Papa.parse('locations.csv', {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        results.data.forEach(row => {
+          const lat = parseFloat(row.lat);
+          const lng = parseFloat(row.lng);
+          if (isNaN(lat) || isNaN(lng)) return;
+
+          const color = CATEGORY_COLORS[row.category] || DEFAULT_COLOR;
+          const marker = L.circleMarker([lat, lng], {
+            radius: 9,
+            fillColor: color,
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+          }).addTo(map);
+
+          const gmapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+          let popup = `<b>${row.name}</b><br>${row.category}`;
+          if (row.singer) popup += ` | ${row.singer}`;
+          if (row.description) popup += `<br>${row.description}`;
+          popup += `<br>`;
+          if (row.source_url) popup += `<a href="${row.source_url}" target="_blank">出典</a> ／ `;
+          popup += `<a href="${gmapsUrl}" target="_blank">Googleマップで開く</a>`;
+
+          marker.bindPopup(popup);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
