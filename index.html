@@ -33,13 +33,21 @@
     const SINGER_ICONS = [
       'LEWNE',
       'NEUN',
-      'RuriEnma',
-      'MinaseNagi',
+      '焔魔るり',
+      '水瀬凪',
     ];
 
+    const SINGER_ICON_MAP = {
+      '焔魔るり': 'RuriEnma',
+      '水瀬凪': 'MinaseNagi',
+    };
+
+
+
     function makeIcon(singerName) {
+      const filename = SINGER_ICON_MAP[singerName] || singerName;
       const path = (singerName && SINGER_ICONS.includes(singerName))
-        ? `icons/${singerName}_MapIcon.png`
+        ? `icons/${filename}_MapIcon.png`
         : DEFAULT_ICON;
       return L.icon({
         iconUrl: path,
