@@ -9,6 +9,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: sans-serif; }
     #map { height: 100vh; width: 100%; }
+    .leaflet-popup-content { min-width: 200px; max-width: 300px; }
 
   </style>
 </head>
@@ -67,7 +68,7 @@
           let line4 = `<a href="${gmapsUrl}" target="_blank">Googleマップで開く</a>`;
           if (row.source_url) line4 += ` │ <a href="${row.source_url}" target="_blank">出典</a>`;
           let popup = `<b>${row.name}</b><br>${line2}`;
-          if (row.description) popup += `<br>${row.description}`;
+          if (row.description) popup += `<br>${row.description.replace(/\\n/g, '<br>')}`;
           popup += `<br>${line4}`;
 
           marker.bindPopup(popup);
