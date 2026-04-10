@@ -10,36 +10,10 @@
     body { font-family: sans-serif; }
     #map { height: 100vh; width: 100%; }
 
-    #legend {
-      position: absolute;
-      bottom: 30px;
-      right: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px 14px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      font-size: 13px;
-      line-height: 1.8;
-    }
-    #legend .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #legend .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      border: 2px solid white;
-      box-shadow: 0 0 0 1px #aaa;
-      flex-shrink: 0;
-    }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="legend"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -49,22 +23,27 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
     }).addTo(map);
 
-    const CATEGORY_COLORS = {
-      'ライブ会場': '#e74c3c',
-      'MV撮影地': '#3498db',
-      'お気に入り店': '#2ecc71',
-    };
-    const DEFAULT_COLOR = '#95a5a6';
+    const DEFAULT_ICON = 'icons/RKM_MapIcon.png';
+    const ICON_SIZE = [36, 36];
+    const ICON_ANCHOR = [18, 36];
+    const POPUP_ANCHOR = [0, -36];
 
-    // 凡例を生成
-    const legend = document.getElementById('legend');
-    Object.entries(CATEGORY_COLORS).forEach(([name, color]) => {
-      legend.innerHTML += `
-        <div class="legend-item">
-          <div class="dot" style="background:${color}"></div>
-          <span>${name}</span>
-        </div>`;
-    });
+    // シンガー別アイコンが揃い次第、icons/${singerName}_MapIcon.png を参照する
+    const SINGER_ICONS = [
+      // 例: '深影', '妃玖',
+    ];
+
+    function makeIcon(singerName) {
+      const path = (singerName && SINGER_ICONS.includes(singerName))
+        ? `icons/${singerName}_MapIcon.png`
+        : DEFAULT_ICON;
+      return L.icon({
+        iconUrl: path,
+        iconSize: ICON_SIZE,
+        iconAnchor: ICON_ANCHOR,
+        popupAnchor: POPUP_ANCHOR,
+      });
+    }
 
     Papa.parse('locations.csv', {
       download: true,
@@ -76,15 +55,11 @@
           const lng = parseFloat(row.lng);
           if (isNaN(lat) || isNaN(lng)) return;
 
-          const color = CATEGORY_COLORS[row.category] || DEFAULT_COLOR;
-          const marker = L.circleMarker([lat, lng], {
-            radius: 9,
-            fillColor: color,
-            color: '#fff',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.9
-          }).addTo(map);
+          // singer列が複数名の場合は最初の1名のアイコンを使用
+          const primarySinger = row.singer ? row.singer.split(',')[0].trim() : '';
+          const icon = makeIcon(primarySinger);
+          const marker = L.marker([lat, lng], { icon }).addTo(map);
+
 
           const gmapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
           let popup = `<b>${row.name}</b><br>${row.category}`;
