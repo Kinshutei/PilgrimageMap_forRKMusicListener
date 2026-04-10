@@ -10,6 +10,19 @@
     body { font-family: sans-serif; }
     #map { height: 100vh; width: 100%; }
     .leaflet-popup-content { min-width: 200px; max-width: 400px; }
+    .city-nav-control {
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .city-btn {
+      background: white; border-bottom: 1px solid rgba(0,0,0,0.2);
+      padding: 5px 8px; font-size: 12px; cursor: pointer; text-align: center;
+      white-space: nowrap; display: block; width: 100%; border-left: none; border-right: none; border-top: none;
+    }
+    .city-btn:last-child { border-bottom: none; }
+    .city-btn:hover { background: #f0f0f0; }
 
   </style>
 </head>
@@ -20,6 +33,32 @@
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     const map = L.map('map').setView([35.6812, 139.7671], 10);
+
+    const CityNav = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function() {
+        const cities = [
+          { name: '札幌', lat: 43.06868968783889, lng: 141.35073393680148 },
+          { name: '仙台', lat: 38.26020372678998, lng: 140.88245087327974 },
+          { name: '東京', lat: 35.6812, lng: 139.7671 },
+          { name: '名古屋', lat: 35.1709412437789, lng: 136.88153016380255 },
+          { name: '大阪', lat: 34.70250298593893, lng: 135.49598278707904 },
+          { name: '広島', lat: 34.397684031834, lng: 132.4753809063038 },
+          { name: '福岡', lat: 33.58973715873517, lng: 130.42072724000244 },
+        ];
+        const container = L.DomUtil.create('div', 'city-nav-control');
+        L.DomEvent.disableClickPropagation(container);
+        cities.forEach(c => {
+          const btn = L.DomUtil.create('button', 'city-btn', container);
+          btn.textContent = c.name;
+          L.DomEvent.on(btn, 'click', () => map.setView([c.lat, c.lng], 13));
+        });
+        return container;
+      }
+    });
+    new CityNav().addTo(map);
+
+    function jumpTo(lat, lng) { map.setView([lat, lng], 13); }
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
     }).addTo(map);
@@ -72,6 +111,8 @@
       header: true,
       skipEmptyLines: true,
       complete: function(results) {
+        // 全マーカーを収集
+        const pending = [];
         results.data.forEach(row => {
           const lat = parseFloat(row.lat);
           const lng = parseFloat(row.lng);
@@ -87,13 +128,27 @@
           if (row.description) popup += `<br>${row.description.replace(/\n/g, '<br>')}`;
           popup += `<br>${line4}`;
 
-          singers.forEach((singer, idx) => {
-            const offset = 0.00003;
-            const angle = (2 * Math.PI / singers.length) * idx;
-            const offsetLat = singers.length > 1 ? lat + offset * Math.cos(angle) : lat;
-            const offsetLng = singers.length > 1 ? lng + offset * Math.sin(angle) : lng;
-            const icon = makeIcon(singer);
-            L.marker([offsetLat, offsetLng], { icon }).addTo(map).bindPopup(popup);
+          singers.forEach(singer => {
+            pending.push({ lat, lng, icon: makeIcon(singer), popup });
+          });
+        });
+
+        // 同座標でグループ化
+        const groups = {};
+        pending.forEach(m => {
+          const key = `${m.lat},${m.lng}`;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(m);
+        });
+
+        // グループ内でオフセットして配置
+        const OFFSET = 0.00003;
+        Object.values(groups).forEach(markers => {
+          markers.forEach((m, idx) => {
+            const angle = (2 * Math.PI / markers.length) * idx;
+            const lat = markers.length > 1 ? m.lat + OFFSET * Math.cos(angle) : m.lat;
+            const lng = markers.length > 1 ? m.lng + OFFSET * Math.sin(angle) : m.lng;
+            L.marker([lat, lng], { icon: m.icon }).addTo(map).bindPopup(m.popup);
           });
         });
       }
