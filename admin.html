@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>聖地登録管理 — RK Music</title>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f14;
+      --surface: #141720;
+      --surface2: #1c2030;
+      --border: #2a2f42;
+      --accent: #6b9fd4;
+      --accent-dim: rgba(107,159,212,0.15);
+      --text: #e0e4f0;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --success: #4ade80;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Noto Sans JP', system-ui, sans-serif;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; padding: 40px 20px; }
+    .container { max-width: 960px; margin: 0 auto; }
+
+    h1 { font-size: 18px; font-weight: 500; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 28px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+
+    /* ── ファイル読み込み ── */
+    .load-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .file-btn {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--text-muted); font-family: var(--sans); font-size: 12px;
+      padding: 5px 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .file-btn:hover { border-color: var(--accent); color: var(--accent); }
+    input[type="file"] { display: none; }
+    .csv-label {
+      display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;
+    }
+    .csv-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; transition: background 0.3s;
+    }
+    .csv-dot.loaded { background: var(--success); }
+    .csv-name { color: var(--text-dim); white-space: nowrap; }
+    .load-sep { color: var(--border); margin: 0 6px; }
+
+    /* ── フォーム ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    input[type="text"], select {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: var(--mono); font-size: 13px; padding: 9px 12px;
+      outline: none; transition: border-color 0.2s;
+    }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-primary {
+      flex: 2; background: var(--accent); color: #0d0f14;
+      border: none; border-radius: 6px; font-family: var(--sans); font-size: 14px;
+      font-weight: 500; padding: 10px; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary {
+      flex: 1; background: transparent; border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted); font-family: var(--sans);
+      font-size: 14px; padding: 10px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* ── テーブル ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      font-size: 10px; font-weight: 500; color: var(--text-muted);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap;
+    }
+    td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    td.name { color: var(--text); font-weight: 500; }
+    td.singer { color: var(--accent); font-family: var(--mono); font-size: 11px; }
+    td.category { color: var(--text-dim); }
+    td.coords { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+    .row-actions { display: flex; gap: 6px; }
+    .btn-edit, .btn-delete {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+      font-size: 11px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-edit { color: var(--accent); }
+    .btn-edit:hover { border-color: var(--accent); }
+    .btn-delete { color: var(--danger); }
+    .btn-delete:hover { border-color: var(--danger); }
+
+    /* ── ダウンロード ── */
+    .download-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .btn-download {
+      background: var(--accent-dim); border: 1px solid var(--accent);
+      border-radius: 6px; color: var(--accent); font-family: var(--sans);
+      font-size: 14px; padding: 10px 20px; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-download:hover { background: rgba(107,159,212,0.25); }
+    .download-note { font-size: 12px; color: var(--text-muted); }
+
+    .empty-note { text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px; }
+
+    /* 編集中ハイライト */
+    tr.editing td { background: rgba(107,159,212,0.08); }
+
+    /* ── カテゴリ管理 ── */
+    .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; min-height: 32px; }
+    .cat-tag {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--text-dim);
+    }
+    .cat-tag-del {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+      transition: color 0.15s;
+    }
+    .cat-tag-del:hover { color: var(--danger); }
+    .cat-add-bar { display: flex; gap: 8px; }
+    .cat-add-bar input { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>聖地登録管理 — RK Music</h1>
+
+    <!-- ファイル読み込み -->
+    <div class="card">
+      <div class="card-title">CSVファイル</div>
+      <div class="load-bar">
+        <div class="csv-label">
+          <div class="csv-dot" id="locDot"></div>
+          <span class="csv-name" id="locName">LOCATION</span>
+        </div>
+        <button class="file-btn" id="btnDlLoc">DL</button>
+        <label class="file-btn" for="csvFile">読込</label>
+        <input type="file" id="csvFile" accept=".csv">
+        <span class="load-sep">│</span>
+        <div class="csv-label">
+          <div class="csv-dot" id="catDot"></div>
+          <span class="csv-name" id="catName">CATEGORIES</span>
+        </div>
+        <button class="file-btn" id="btnDlCat">DL</button>
+        <label class="file-btn" for="catFile">読込</label>
+        <input type="file" id="catFile" accept=".csv">
+      </div>
+    </div>
+
+    <!-- カテゴリ管理 -->
+    <div class="card">
+      <div class="card-title">カテゴリ管理</div>
+      <div class="cat-list" id="catList"></div>
+      <div class="cat-add-bar">
+        <input type="text" id="catInput" placeholder="新しいカテゴリ名">
+        <button class="btn-primary" id="btnAddCat" style="flex:0 0 auto;padding:9px 18px;font-size:13px;">追加</button>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn-download" id="btnDownloadCat">categories.csv をダウンロード</button>
+      </div>
+    </div>
+
+    <!-- 入力フォーム -->
+    <div class="card">
+      <div class="card-title" id="formTitle">新規登録</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>場所名</label>
+          <input type="text" id="f-name" placeholder="〇〇公園">
+        </div>
+        <div class="form-group">
+          <label>カテゴリ</label>
+          <select id="f-category"></select>
+        </div>
+        <div class="form-group">
+          <label>シンガー</label>
+          <input type="text" id="f-singer" placeholder="深影（複数の場合はカンマ区切り）">
+        </div>
+        <div class="form-group full">
+          <label>座標（Googleマップからコピペ）</label>
+          <input type="text" id="f-coords" placeholder="35.465741687201024, 139.62223416259408">
+        </div>
+        <div class="form-group">
+          <label>出典URL</label>
+          <input type="text" id="f-source_url" placeholder="https://...">
+        </div>
+        <div class="form-group full">
+          <label>説明</label>
+          <input type="text" id="f-description" placeholder="〇〇MVのサビシーン">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" id="btnAdd">登録</button>
+        <button class="btn-secondary" id="btnCancel" style="display:none">キャンセル</button>
+      </div>
+    </div>
+
+    <!-- 登録一覧 -->
+    <div class="card">
+      <div class="card-title">登録一覧 <span id="countBadge" style="color:var(--text-muted);font-size:11px;"></span></div>
+      <div class="table-wrap">
+        <table id="locTable">
+          <thead>
+            <tr>
+              <th>場所名</th>
+              <th>カテゴリ</th>
+              <th>シンガー</th>
+              <th>緯度</th>
+              <th>経度</th>
+              <th>説明</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="7" class="empty-note">CSVを読み込んでください</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ダウンロード -->
+    <div class="card">
+      <div class="card-title">エクスポート</div>
+      <div class="download-bar">
+        <button class="btn-download" id="btnDownload">locations.csv をダウンロード</button>
+        <span class="download-note">ダウンロード後、リポジトリに上書きしてpushしてください</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const COLS = ['name','category','singer','lat','lng','description','source_url'];
+    let rows = [];
+    let editIndex = -1;
+    let categories = ['ライブ会場', 'MV撮影地', 'お気に入り店'];
+
+    // ── カテゴリ管理 ──
+    function renderCategories() {
+      const list = document.getElementById('catList');
+      const sel = document.getElementById('f-category');
+      const current = sel.value;
+
+      list.innerHTML = categories.map(c => `
+        <div class="cat-tag">
+          <span>${esc(c)}</span>
+          <button class="cat-tag-del" onclick="deleteCategory('${esc(c)}')" title="削除">×</button>
+        </div>`).join('');
+
+      sel.innerHTML = '<option value="">選択してください</option>' +
+        categories.map(c => `<option value="${esc(c)}" ${c === current ? 'selected' : ''}>${esc(c)}</option>`).join('');
+    }
+
+    function deleteCategory(name) {
+      if (!confirm(`カテゴリ「${name}」を削除しますか？`)) return;
+      categories = categories.filter(c => c !== name);
+      renderCategories();
+    }
+
+    document.getElementById('btnAddCat').addEventListener('click', () => {
+      const name = document.getElementById('catInput').value.trim();
+      if (!name) return;
+      if (categories.includes(name)) { alert('同じカテゴリが既に存在します'); return; }
+      categories.push(name);
+      document.getElementById('catInput').value = '';
+      renderCategories();
+    });
+
+    document.getElementById('catInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btnAddCat').click();
+    });
+
+    function downloadCategories() {
+      const csv = Papa.unparse({ fields: ['name'], data: categories.map(c => ({ name: c })) });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'categories.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+    document.getElementById('btnDownloadCat').addEventListener('click', downloadCategories);
+    document.getElementById('btnDlCat').addEventListener('click', () => fetchFromRepo('categories.csv'));
+
+    // categories.csv 読み込み
+    document.getElementById('catFile').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: result => {
+          categories = result.data.map(r => r.name).filter(Boolean);
+          document.getElementById('catDot').classList.add('loaded');
+          document.getElementById('catName').textContent = `CATEGORIES (${categories.length}件)`;
+          document.getElementById('btnDlCat').disabled = false;
+          renderCategories();
+        }
+      });
+    });
+
+    renderCategories();
+
+    // ── CSV読み込み ──
+    document.getElementById('csvFile').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: result => {
+          rows = result.data.map(r => ({
+            name: r.name || '',
+            category: r.category || '',
+            singer: r.singer || '',
+            lat: r.lat || '',
+            lng: r.lng || '',
+            description: r.description || '',
+            source_url: r.source_url || '',
+          }));
+          document.getElementById('locDot').classList.add('loaded');
+          document.getElementById('locName').textContent = `LOCATION (${rows.length}件)`;
+          document.getElementById('btnDlLoc').disabled = false;
+          renderTable();
+        }
+      });
+    });
+
+    // ── テーブル描画 ──
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      document.getElementById('countBadge').textContent = `${rows.length}件`;
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-note">登録データがありません</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map((r, i) => `
+        <tr id="row-${i}" ${editIndex === i ? 'class="editing"' : ''}>
+          <td class="name">${esc(r.name)}</td>
+          <td class="category">${esc(r.category)}</td>
+          <td class="singer">${esc(r.singer)}</td>
+          <td class="coords">${esc(r.lat)}</td>
+          <td class="coords">${esc(r.lng)}</td>
+          <td>${esc(r.description)}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn-edit" onclick="startEdit(${i})">編集</button>
+              <button class="btn-delete" onclick="deleteRow(${i})">削除</button>
+            </div>
+          </td>
+        </tr>`).join('');
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── 登録 / 更新 ──
+    document.getElementById('btnAdd').addEventListener('click', () => {
+      const coords = v('f-coords');
+      const parts = coords.split(',').map(s => s.trim());
+      if (coords && parts.length !== 2) { alert('座標はカンマ区切りで入力してください'); return; }
+      const entry = {
+        name: v('f-name'),
+        category: v('f-category'),
+        singer: v('f-singer'),
+        lat: parts[0] ?? '',
+        lng: parts[1] ?? '',
+        description: v('f-description'),
+        source_url: v('f-source_url'),
+      };
+      if (!entry.name) { alert('場所名は必須です'); return; }
+
+      if (editIndex >= 0) {
+        rows[editIndex] = entry;
+        editIndex = -1;
+        document.getElementById('formTitle').textContent = '新規登録';
+        document.getElementById('btnAdd').textContent = '登録';
+        document.getElementById('btnCancel').style.display = 'none';
+      } else {
+        rows.push(entry);
+      }
+      clearForm();
+      renderTable();
+    });
+
+    document.getElementById('btnCancel').addEventListener('click', () => {
+      editIndex = -1;
+      clearForm();
+      document.getElementById('formTitle').textContent = '新規登録';
+      document.getElementById('btnAdd').textContent = '登録';
+      document.getElementById('btnCancel').style.display = 'none';
+      renderTable();
+    });
+
+    function startEdit(i) {
+      editIndex = i;
+      const r = rows[i];
+      set('f-name', r.name);
+      set('f-category', r.category);
+      set('f-singer', r.singer);
+      set('f-coords', r.lat && r.lng ? `${r.lat}, ${r.lng}` : '');
+      set('f-description', r.description);
+      set('f-source_url', r.source_url);
+      document.getElementById('formTitle').textContent = '編集中';
+      document.getElementById('btnAdd').textContent = '更新';
+      document.getElementById('btnCancel').style.display = '';
+      renderTable();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteRow(i) {
+      if (!confirm(`「${rows[i].name}」を削除しますか？`)) return;
+      rows.splice(i, 1);
+      if (editIndex === i) { editIndex = -1; clearForm(); }
+      renderTable();
+    }
+
+    // ── CSVダウンロード ──
+    function downloadLocations() {
+      const csv = Papa.unparse({ fields: COLS, data: rows });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'locations.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+    document.getElementById('btnDownload').addEventListener('click', downloadLocations);
+    document.getElementById('btnDlLoc').addEventListener('click', () => fetchFromRepo('locations.csv'));
+
+    // ── リポジトリからダウンロード ──
+    const REPO_BASE = 'https://kinshutei.github.io/PilgrimageMap_forRKMusicListener';
+    async function fetchFromRepo(filename) {
+      try {
+        const res = await fetch(`${REPO_BASE}/${filename}?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`${res.status}`);
+        const text = await res.text();
+        const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert(`取得に失敗しました: ${e.message}`);
+      }
+    }
+
+    function v(id) { return document.getElementById(id).value.trim(); }
+    function set(id, val) {
+      const el = document.getElementById(id);
+      el.value = val ?? '';
+    }
+    function clearForm() {
+      ['f-name','f-category','f-singer','f-coords','f-description','f-source_url'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+    }
+  </script>
+</body>
+</html>
