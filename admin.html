@@ -309,8 +309,10 @@
         tbody.innerHTML = '<tr><td colspan="7" class="empty-note">登録データがありません</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map((r, i) => `
-        <tr id="row-${i}" ${editIndex === i ? 'class="editing"' : ''}>
+      tbody.innerHTML = [...rows].reverse().map((r, i) => {
+        const origIndex = rows.length - 1 - i;
+        return `
+        <tr id="row-${origIndex}" ${editIndex === origIndex ? 'class="editing"' : ''}>
           <td class="name">${esc(r.name)}</td>
           <td class="category">${esc(r.category)}</td>
           <td class="singer">${esc(r.singer)}</td>
@@ -319,11 +321,12 @@
           <td>${esc(r.description)}</td>
           <td>
             <div class="row-actions">
-              <button class="btn-edit" onclick="startEdit(${i})">編集</button>
-              <button class="btn-delete" onclick="deleteRow(${i})">削除</button>
+              <button class="btn-edit" onclick="startEdit(${origIndex})">編集</button>
+              <button class="btn-delete" onclick="deleteRow(${origIndex})">削除</button>
             </div>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
 
     function esc(s) {
@@ -425,12 +428,20 @@
         toast(`取得に失敗しました: ${e.message}`);
       }
     }
+    // 場所名 → 座標のメモリ
+    let locationMemory = {};
+
     document.getElementById('btnReadLoc').addEventListener('click', () => {
       readFromRepo('locations.csv', result => {
         rows = result.data.map(r => ({
           name: r.name || '', category: r.category || '', singer: r.singer || '',
           lat: r.lat || '', lng: r.lng || '', description: r.description || '', source_url: r.source_url || '',
         }));
+        // メモリ構築
+        locationMemory = {};
+        rows.forEach(r => {
+          if (r.name && r.lat && r.lng) locationMemory[r.name] = { coords: `${r.lat}, ${r.lng}`, category: r.category };
+        });
         document.getElementById('locDot').classList.add('loaded');
         document.getElementById('locName').textContent = `LOCATION (${rows.length}件)`;
         renderTable();
@@ -487,6 +498,16 @@
     document.getElementById('btnPushCat').addEventListener('click', () => {
       const csv = Papa.unparse({ fields: ['name'], data: categories.map(c => ({ name: c })) });
       pushToRepo('categories.csv', csv);
+    });
+
+    // 場所名入力時に座標を自動補完
+    document.getElementById('f-name').addEventListener('input', e => {
+      const name = e.target.value.trim();
+      const mem = locationMemory[name];
+      if (mem) {
+        set('f-coords', mem.coords);
+        set('f-category', mem.category);
+      }
     });
 
     function v(id) { return document.getElementById(id).value.trim(); }
