@@ -24,10 +24,56 @@
     .city-btn:last-child { border-bottom: none; }
     .city-btn:hover { background: #f0f0f0; }
 
+    #singer-filter {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+      padding: 6px;
+      max-width: 180px;
+    }
+    .singer-btn {
+      display: block;
+      width: 100%;
+      padding: 4px 8px;
+      margin-bottom: 3px;
+      font-size: 12px;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      text-align: left;
+    }
+    .singer-btn.active {
+      background: #4a90d9;
+      color: white;
+      border-color: #3a7ac8;
+    }
+    .singer-btn:hover:not(.active) { background: #f0f0f0; }
+    #reset-btn {
+      display: block;
+      width: 100%;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      background: #f5f5f5;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      margin-top: 4px;
+    }
+    #reset-btn:hover { background: #e0e0e0; }
+
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="singer-filter">
+    <div id="singer-buttons"></div>
+    <button id="reset-btn">リセット</button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -108,6 +154,28 @@
       });
     }
 
+    // タレントフィルター
+    const activeSingers = new Set();
+    const singerMarkers = []; // { marker, singers[] }
+
+    function applyFilter() {
+      singerMarkers.forEach(({ marker, singer }) => {
+        if (activeSingers.size === 0) {
+          marker.addTo(map);
+        } else {
+          const visible = singer && activeSingers.has(singer);
+          if (visible) marker.addTo(map);
+          else map.removeLayer(marker);
+        }
+      });
+    }
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      activeSingers.clear();
+      document.querySelectorAll('.singer-btn').forEach(b => b.classList.remove('active'));
+      applyFilter();
+    });
+
     Papa.parse('https://kinshutei.github.io/PilgrimageMap_forRKMusicListener/locations.csv', {
       download: true,
       header: true,
@@ -120,7 +188,7 @@
           const lng = parseFloat(row.lng);
           if (isNaN(lat) || isNaN(lng)) return;
 
-          const singers = row.singer ? row.singer.split(',').map(s => s.trim()).filter(Boolean) : [''];
+          const singers = row.singer ? row.singer.split(',').map(s => s.trim()).filter(Boolean) : [];
           const gmapsUrl = `https://maps.google.com/?q=${encodeURIComponent(row.name)}&ll=${lat},${lng}`;
           let line2 = row.category;
           if (row.singer) line2 += ` │ ${row.singer}`;
@@ -130,8 +198,9 @@
           if (row.description) popup += `<br>${row.description.replace(/\n/g, '<br>')}`;
           popup += `<br>${line4}`;
 
-          singers.forEach(singer => {
-            pending.push({ lat, lng, icon: makeIcon(singer), popup });
+          const iconSingers = singers.length > 0 ? singers : [''];
+          iconSingers.forEach(singer => {
+            pending.push({ lat, lng, icon: makeIcon(singer), popup, singer });
           });
         });
 
@@ -150,8 +219,41 @@
             const angle = (2 * Math.PI / markers.length) * idx;
             const lat = markers.length > 1 ? m.lat + OFFSET * Math.cos(angle) : m.lat;
             const lng = markers.length > 1 ? m.lng + OFFSET * Math.sin(angle) : m.lng;
-            L.marker([lat, lng], { icon: m.icon }).addTo(map).bindPopup(m.popup);
+            const marker = L.marker([lat, lng], { icon: m.icon }).addTo(map).bindPopup(m.popup);
+            singerMarkers.push({ marker, singer: m.singer });
           });
+        });
+
+        // ユニーク歌い手名を収集してボタン生成
+        const allSingers = new Set();
+        results.data.forEach(row => {
+          if (row.singer) row.singer.split(',').map(s => s.trim()).filter(Boolean).forEach(s => allSingers.add(s));
+        });
+        const SINGER_ORDER = [
+          '焔魔るり', 'HACHI', '瀬戸乃とと', '水瀬凪', 'KMNZ', 'VESPERBELL', 'CULUA',
+          'NEUN', 'MEDA', 'CONA', 'IMI', 'XIDEN', 'ヨノ', 'LEWNE', '羽緒', 'Cil',
+          '深影', 'wouca', 'Diα', '妃玖',
+        ];
+        const sorted = [
+          ...SINGER_ORDER.filter(s => allSingers.has(s)),
+          ...[...allSingers].filter(s => !SINGER_ORDER.includes(s)).sort(),
+        ];
+        const container = document.getElementById('singer-buttons');
+        sorted.forEach(singer => {
+          const btn = document.createElement('button');
+          btn.className = 'singer-btn';
+          btn.textContent = singer;
+          btn.addEventListener('click', () => {
+            if (activeSingers.has(singer)) {
+              activeSingers.delete(singer);
+              btn.classList.remove('active');
+            } else {
+              activeSingers.add(singer);
+              btn.classList.add('active');
+            }
+            applyFilter();
+          });
+          container.appendChild(btn);
         });
       }
     });
